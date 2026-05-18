@@ -52,59 +52,56 @@ modelo.fit(X_train, y_train)
 predicciones = modelo.predict(X_test)
 probabilidades = modelo.predict_proba(X_test)
 
-print("Accuracy:", accuracy_score(y_test, predicciones))
-
+print("=" * 50)
+print("EVALUACIÓN DEL MODELO")
+print("=" * 50)
+print(f"Accuracy : {accuracy_score(y_test, predicciones):.4f}")
+print(f"\nClases   : {list(modelo.classes_)}")
 print("\nMatriz de confusión:")
 print(confusion_matrix(y_test, predicciones, labels=modelo.classes_))
-
-print("\nClases:")
-print(modelo.classes_)
-
 print("\nReporte de clasificación:")
 print(classification_report(y_test, predicciones))
 
-resultado = datos_test.copy()
-resultado["Predicción"] = predicciones
-
-for i, clase in enumerate(modelo.classes_):
-    resultado[f"Probabilidad_{clase}"] = probabilidades[:, i]
-
-resultado.to_excel("predicciones_penales.xlsx", index=False)
-
-
-"""
-modelos = {
-    "Regresión logística multinomial": LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced"
-    ),
-    "Árbol de decisión": DecisionTreeClassifier(
-        max_depth=3,
-        random_state=42,
-        class_weight="balanced"
-    ),
-    "Random Forest": RandomForestClassifier(
-        n_estimators=300,
-        max_depth=3,
-        random_state=42,
-        class_weight="balanced"
-    )
-}
-
-for nombre, clasificador in modelos.items():
-    pipeline = Pipeline(
-        steps=[
-            ("preprocesamiento", preprocesamiento),
-            ("clasificador", clasificador)
-        ]
-    )
-
-    pipeline.fit(X_train, y_train)
-    pred = pipeline.predict(X_test)
-
-    accuracy = accuracy_score(y_test, pred)
-
-    print(nombre)
-    print("Accuracy en testeo:", accuracy)
-    print()
-"""
+OPCIONES_PIE   = ["Derecho", "Izquierdo"]
+OPCIONES_BRAZO = ["EXTENDIDO", "ENCOGE"]
+ 
+def elegir_opcion(mensaje, opciones):
+    """Muestra las opciones numeradas y devuelve el valor elegido."""
+    while True:
+        print(f"\n{mensaje}")
+        for i, op in enumerate(opciones, 1):
+            print(f"  {i}. {op}")
+        entrada = input("Ingresá el número: ").strip()
+        if entrada.isdigit() and 1 <= int(entrada) <= len(opciones):
+            return opciones[int(entrada) - 1]
+        print("  ✗ Opción inválida, intentá de nuevo.")
+ 
+def predecir_penal():
+    print("\n" + "=" * 50)
+    print("PREDICTOR DE PENALES")
+    print("=" * 50)
+ 
+    pie   = elegir_opcion("¿Cuál es el pie del pateador?", OPCIONES_PIE)
+    brazo = elegir_opcion("¿Cuál es el movimiento del brazo?", OPCIONES_BRAZO)
+ 
+    nuevo = pd.DataFrame({"Pie": [pie], "Movimiento_brazo": [brazo]})
+    pred  = modelo.predict(nuevo)[0]
+    proba = modelo.predict_proba(nuevo)[0]
+ 
+    print("\n── Resultado ──────────────────────────────")
+    print(f"  Pie             : {pie}")
+    print(f"  Movimiento brazo: {brazo}")
+    print(f"\n  Predicción      : {pred}")
+    print("\n  Probabilidades:")
+    for clase, prob in sorted(zip(modelo.classes_, proba), key=lambda x: -x[1]):
+        barra = "█" * int(prob * 30)
+        print(f"    {clase:<12} {prob*100:5.1f}%  {barra}")
+    print("─" * 43)
+ 
+i = True
+while i:
+    predecir_penal()
+    continuar = input("\n¿Querés predecir otro penal? (s/n): ").strip().lower()
+    if continuar != "s":
+        print("\nSaliendo del predictor.")
+        i = False

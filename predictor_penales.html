@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predictor de Penales — Random Forest</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green-dark: #0d3320;
+  --green-field: #1a5c35;
+  --green-mid: #1e6b3d;
+  --green-light: #2a8a4e;
+  --line: rgba(255,255,255,0.18);
+  --white: #f5f5f0;
+  --gold: #e8c84a;
+  --red: #d94040;
+  --blue: #3d82c4;
+  --text-muted: rgba(245,245,240,0.5);
+  --card-bg: rgba(0,0,0,0.25);
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Barlow', sans-serif;
+  background: var(--green-dark);
+  color: var(--white);
+  min-height: 100vh;
+  padding: 0 0 4rem;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 59px,
+      rgba(255,255,255,0.03) 59px,
+      rgba(255,255,255,0.03) 60px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 59px,
+      rgba(255,255,255,0.03) 59px,
+      rgba(255,255,255,0.03) 60px
+    );
+}
+
+header {
+  background: rgba(0,0,0,0.4);
+  border-bottom: 1px solid var(--line);
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-mark {
+  width: 40px; height: 40px;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800; font-size: 18px;
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+header span {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-left: auto;
+  font-weight: 400;
+}
+
+.main { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+/* ── Step 1: cantidad ── */
+.step-card {
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.step-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem;
+}
+
+.step-num {
+  width: 26px; height: 26px;
+  background: var(--gold);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; font-size: 14px;
+  color: var(--green-dark);
+  flex-shrink: 0;
+}
+
+.step-header h2 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; font-size: 17px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.qty-row {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+
+.qty-input {
+  width: 80px; padding: 10px 12px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: var(--radius);
+  color: var(--white);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px; font-weight: 700;
+  text-align: center;
+}
+
+.qty-input:focus { outline: none; border-color: var(--gold); }
+
+.btn-primary {
+  padding: 10px 24px;
+  background: var(--gold);
+  border: none; border-radius: var(--radius);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; font-size: 16px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--green-dark);
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.qty-hint { font-size: 13px; color: var(--text-muted); }
+
+/* ── Grid de penales ── */
+#penalties-section { display: none; }
+
+.penalties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.penalty-card {
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  transition: border-color 0.2s;
+}
+
+.penalty-card.has-data { border-color: rgba(232,200,74,0.35); }
+.penalty-card.predicted { border-color: rgba(255,255,255,0.15); }
+
+.penalty-num {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.field-label {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.toggle-row { display: flex; gap: 6px; margin-bottom: 1rem; }
+
+.toggle-btn {
+  flex: 1; padding: 8px 6px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  color: rgba(245,245,240,0.6);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600; font-size: 13px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.toggle-btn:hover { border-color: rgba(255,255,255,0.3); color: var(--white); }
+.toggle-btn.active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--green-dark);
+}
+
+/* ── Resultado inline ── */
+.result-inline {
+  display: none;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.result-dir {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800; font-size: 22px;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.75rem;
+}
+
+.dir-IZQUIERDA { color: #64b5f6; }
+.dir-DERECHA   { color: #ef9a9a; }
+.dir-CENTRO    { color: var(--gold); }
+
+/* Mini portería */
+.mini-goal {
+  display: flex;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  border-radius: 3px;
+  height: 44px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+.mg-zone {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.3);
+  border-right: 1px dashed rgba(255,255,255,0.12);
+  transition: background 0.25s;
+}
+.mg-zone:last-child { border-right: none; }
+.mg-zone.hit-izq { background: rgba(100,181,246,0.25); color: #64b5f6; }
+.mg-zone.hit-cen { background: rgba(232,200,74,0.2); color: var(--gold); }
+.mg-zone.hit-der { background: rgba(239,154,154,0.25); color: #ef9a9a; }
+
+.prob-mini { display: flex; gap: 4px; align-items: flex-end; height: 28px; }
+.prob-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.prob-bar-col {
+  width: 100%; border-radius: 2px 2px 0 0;
+  transition: height 0.4s ease;
+  min-height: 2px;
+}
+.bar-izq { background: #64b5f6; }
+.bar-cen { background: var(--gold); }
+.bar-der { background: #ef9a9a; }
+.prob-pct-mini {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Botón predecir todos ── */
+.predict-all-row {
+  display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+#progress-txt { font-size: 13px; color: var(--text-muted); }
+
+/* ── Resumen final ── */
+#summary-section {
+  display: none;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.summary-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800; font-size: 18px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 1.25rem;
+  color: var(--gold);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-stat {
+  background: rgba(0,0,0,0.25);
+  border-radius: var(--radius);
+  padding: 1rem;
+  text-align: center;
+}
+
+.stat-val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800; font-size: 32px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-lbl {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.summary-table {
+  width: 100%; border-collapse: collapse; font-size: 14px;
+}
+.summary-table th {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.summary-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  vertical-align: middle;
+}
+.summary-table tr:last-child td { border-bottom: none; }
+.summary-table td:nth-child(2) { font-weight: 500; }
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase;
+}
+.tag-izq { background: rgba(100,181,246,0.15); color: #64b5f6; }
+.tag-cen { background: rgba(232,200,74,0.15); color: var(--gold); }
+.tag-der { background: rgba(239,154,154,0.15); color: #ef9a9a; }
+
+.btn-reset {
+  margin-top: 1.5rem;
+  padding: 9px 20px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius);
+  color: rgba(255,255,255,0.5);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600; font-size: 14px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-reset:hover { border-color: rgba(255,255,255,0.4); color: var(--white); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">RF</div>
+  <h1>Predictor de Penales</h1>
+  <span>Random Forest · Pie + Movimiento de brazo</span>
+</header>
+
+<div class="main">
+
+  <!-- Paso 1 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <h2>¿Cuántos penales querés cargar?</h2>
+    </div>
+    <div class="qty-row">
+      <input type="number" class="qty-input" id="qty" min="1" max="20" value="3">
+      <button class="btn-primary" onclick="buildCards()">Cargar penales</button>
+      <span class="qty-hint">Máximo 20 penales por vez</span>
+    </div>
+  </div>
+
+  <!-- Paso 2: cards -->
+  <div id="penalties-section">
+    <div class="step-card" style="margin-bottom:1rem; padding: 1rem 1.5rem;">
+      <div class="step-header" style="margin-bottom:0">
+        <div class="step-num">2</div>
+        <h2>Cargá los datos de cada penal</h2>
+      </div>
+    </div>
+
+    <div class="penalties-grid" id="penalties-grid"></div>
+
+    <div class="predict-all-row">
+      <button class="btn-primary" id="predict-all-btn" onclick="predictAll()">
+        ⚽ Predecir todos
+      </button>
+      <span id="progress-txt"></span>
+    </div>
+
+    <div id="summary-section">
+      <div class="summary-title">📊 Resumen de predicciones</div>
+      <div class="summary-grid" id="summary-stats"></div>
+      <table class="summary-table" id="summary-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Pie</th>
+            <th>Brazo</th>
+            <th>Predicción</th>
+            <th>Prob. máx.</th>
+            <th>Distribución</th>
+          </tr>
+        </thead>
+        <tbody id="summary-tbody"></tbody>
+      </table>
+      <button class="btn-reset" onclick="resetAll()">↺ Empezar de nuevo</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Modelo (frecuencias del dataset de entrenamiento, 395 penales) ─────────
+const FREQ = {
+  "Izquierdo|EXTENDIDO": {CENTRO:16, DERECHA:37, IZQUIERDA:16, total:69},
+  "Derecho|ENCOGE":      {CENTRO:19, DERECHA:48, IZQUIERDA:40, total:107},
+  "Derecho|EXTENDIDO":   {CENTRO:26, DERECHA:52, IZQUIERDA:109,total:187},
+  "Izquierdo|ENCOGE":    {CENTRO:6,  DERECHA:11, IZQUIERDA:15, total:32}
+};
+const OVERALL = {CENTRO:67, DERECHA:148, IZQUIERDA:180, total:395};
+const ALPHA = 1;
+
+function getProbs(pie, brazo) {
+  const key = `${pie}|${brazo}`;
+  const f = FREQ[key] || OVERALL;
+  const tot = f.total;
+  const dirs = ['CENTRO','DERECHA','IZQUIERDA'];
+  const raw = {};
+  dirs.forEach(d => raw[d] = (f[d] + ALPHA) / (tot + dirs.length * ALPHA));
+  const sum = dirs.reduce((a,d) => a + raw[d], 0);
+  const probs = {};
+  dirs.forEach(d => probs[d] = raw[d] / sum);
+  return probs;
+}
+
+function predict(pie, brazo) {
+  const probs = getProbs(pie, brazo);
+  const dir = Object.entries(probs).sort((a,b) => b[1]-a[1])[0][0];
+  return { dir, probs };
+}
+
+// ── Construir cards ────────────────────────────────────────────────────────
+let numPenalties = 0;
+
+function buildCards() {
+  const qty = Math.min(20, Math.max(1, parseInt(document.getElementById('qty').value) || 1));
+  numPenalties = qty;
+  document.getElementById('qty').value = qty;
+
+  const grid = document.getElementById('penalties-grid');
+  grid.innerHTML = '';
+  document.getElementById('summary-section').style.display = 'none';
+  document.getElementById('penalties-section').style.display = 'block';
+  document.getElementById('progress-txt').textContent = '';
+
+  for (let i = 1; i <= qty; i++) {
+    grid.appendChild(makeCard(i));
+  }
+  document.getElementById('penalties-section').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function makeCard(n) {
+  const div = document.createElement('div');
+  div.className = 'penalty-card';
+  div.id = `card-${n}`;
+  div.innerHTML = `
+    <div class="penalty-num">Penal #${n}</div>
+
+    <label class="field-label">Pie</label>
+    <div class="toggle-row">
+      <button class="toggle-btn" data-card="${n}" data-field="pie" data-val="Derecho"
+        onclick="toggle(this,'pie',${n})">Derecho</button>
+      <button class="toggle-btn" data-card="${n}" data-field="pie" data-val="Izquierdo"
+        onclick="toggle(this,'pie',${n})">Izquierdo</button>
+    </div>
+
+    <label class="field-label">Movimiento del brazo</label>
+    <div class="toggle-row">
+      <button class="toggle-btn" data-card="${n}" data-field="brazo" data-val="EXTENDIDO"
+        onclick="toggle(this,'brazo',${n})">Extendido</button>
+      <button class="toggle-btn" data-card="${n}" data-field="brazo" data-val="ENCOGE"
+        onclick="toggle(this,'brazo',${n})">Encogido</button>
+    </div>
+
+    <div class="result-inline" id="result-${n}">
+      <div class="result-dir" id="dir-${n}"></div>
+      <div class="mini-goal">
+        <div class="mg-zone" id="mg-izq-${n}">IZQ</div>
+        <div class="mg-zone" id="mg-cen-${n}">CTR</div>
+        <div class="mg-zone" id="mg-der-${n}">DER</div>
+      </div>
+      <div class="prob-mini" id="bars-${n}"></div>
+    </div>
+  `;
+  return div;
+}
+
+// Estado de cada card
+const cardState = {};
+
+function toggle(btn, field, n) {
+  const group = btn.closest('.toggle-row');
+  group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (!cardState[n]) cardState[n] = {};
+  cardState[n][field] = btn.dataset.val;
+
+  const card = document.getElementById(`card-${n}`);
+  if (cardState[n].pie && cardState[n].brazo) {
+    card.classList.add('has-data');
+    showInlineResult(n);
+  }
+}
+
+function showInlineResult(n) {
+  const { pie, brazo } = cardState[n];
+  const { dir, probs } = predict(pie, brazo);
+
+  const dirEl = document.getElementById(`dir-${n}`);
+  dirEl.textContent = {IZQUIERDA:'← IZQUIERDA', CENTRO:'CENTRO', DERECHA:'DERECHA →'}[dir];
+  dirEl.className = `result-dir dir-${dir}`;
+
+  ['izq','cen','der'].forEach(z => {
+    document.getElementById(`mg-izq-${n}`).className = 'mg-zone';
+    document.getElementById(`mg-cen-${n}`).className = 'mg-zone';
+    document.getElementById(`mg-der-${n}`).className = 'mg-zone';
+  });
+  const zm = {IZQUIERDA:`mg-izq-${n}`, CENTRO:`mg-cen-${n}`, DERECHA:`mg-der-${n}`};
+  const hm = {IZQUIERDA:'hit-izq', CENTRO:'hit-cen', DERECHA:'hit-der'};
+  document.getElementById(zm[dir]).classList.add(hm[dir]);
+
+  const barsEl = document.getElementById(`bars-${n}`);
+  const maxP = Math.max(...Object.values(probs));
+  barsEl.innerHTML = ['IZQUIERDA','CENTRO','DERECHA'].map(d => {
+    const pct = Math.round(probs[d]*100);
+    const h = Math.round((probs[d]/maxP)*28);
+    const cls = {IZQUIERDA:'bar-izq',CENTRO:'bar-cen',DERECHA:'bar-der'}[d];
+    return `<div class="prob-bar-wrap">
+      <div class="prob-bar-col ${cls}" style="height:${h}px"></div>
+      <div class="prob-pct-mini">${pct}%</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById(`result-${n}`).style.display = 'block';
+}
+
+// ── Predecir todos ─────────────────────────────────────────────────────────
+async function predictAll() {
+  const btn = document.getElementById('predict-all-btn');
+  const progTxt = document.getElementById('progress-txt');
+
+  // Verificar que todos tienen datos
+  const missing = [];
+  for (let i = 1; i <= numPenalties; i++) {
+    if (!cardState[i] || !cardState[i].pie || !cardState[i].brazo) missing.push(i);
+  }
+  if (missing.length > 0) {
+    progTxt.textContent = `Faltan datos en penal${missing.length>1?'es':''}: ${missing.join(', ')}`;
+    progTxt.style.color = '#ef9a9a';
+    return;
+  }
+  progTxt.style.color = '';
+
+  btn.disabled = true;
+  const results = [];
+
+  for (let i = 1; i <= numPenalties; i++) {
+    progTxt.textContent = `Analizando penal ${i} de ${numPenalties}...`;
+    await new Promise(r => setTimeout(r, 60));
+    const { pie, brazo } = cardState[i];
+    const { dir, probs } = predict(pie, brazo);
+    results.push({ n:i, pie, brazo, dir, probs });
+    showInlineResult(i);
+    document.getElementById(`card-${i}`).classList.remove('has-data');
+    document.getElementById(`card-${i}`).classList.add('predicted');
+  }
+
+  progTxt.textContent = `✓ ${numPenalties} penales analizados`;
+  btn.disabled = false;
+  buildSummary(results);
+}
+
+// ── Resumen ────────────────────────────────────────────────────────────────
+function buildSummary(results) {
+  const counts = {IZQUIERDA:0, CENTRO:0, DERECHA:0};
+  results.forEach(r => counts[r.dir]++);
+  const total = results.length;
+
+  const statsEl = document.getElementById('summary-stats');
+  const clsMap = {IZQUIERDA:'#64b5f6', CENTRO:'#e8c84a', DERECHA:'#ef9a9a'};
+  const lblMap = {IZQUIERDA:'← Izquierda', CENTRO:'Centro', DERECHA:'Derecha →'};
+  statsEl.innerHTML = ['IZQUIERDA','CENTRO','DERECHA'].map(d => `
+    <div class="summary-stat">
+      <div class="stat-val" style="color:${clsMap[d]}">${counts[d]}</div>
+      <div class="stat-lbl">${lblMap[d]}</div>
+    </div>
+  `).join('');
+
+  const tbody = document.getElementById('summary-tbody');
+  const tagCls = {IZQUIERDA:'tag-izq',CENTRO:'tag-cen',DERECHA:'tag-der'};
+  tbody.innerHTML = results.map(r => {
+    const maxP = Math.round(Math.max(...Object.values(r.probs))*100);
+    const bars = ['IZQUIERDA','CENTRO','DERECHA'].map(d => {
+      const w = Math.round(r.probs[d]*60);
+      const c = {IZQUIERDA:'#64b5f6',CENTRO:'#e8c84a',DERECHA:'#ef9a9a'}[d];
+      return `<div style="display:inline-block;width:${w}px;height:5px;background:${c};border-radius:2px;margin-right:2px;vertical-align:middle"></div>`;
+    }).join('');
+    return `<tr>
+      <td style="color:var(--text-muted);font-size:13px">#${r.n}</td>
+      <td>${r.pie}</td>
+      <td>${r.brazo === 'EXTENDIDO' ? 'Extendido' : 'Encogido'}</td>
+      <td><span class="tag ${tagCls[r.dir]}">${r.dir}</span></td>
+      <td style="font-family:'Barlow Condensed',sans-serif;font-weight:700">${maxP}%</td>
+      <td>${bars}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('summary-section').style.display = 'block';
+  document.getElementById('summary-section').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function resetAll() {
+  Object.keys(cardState).forEach(k => delete cardState[k]);
+  document.getElementById('penalties-section').style.display = 'none';
+  document.getElementById('summary-section').style.display = 'none';
+  document.getElementById('qty').value = 3;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
