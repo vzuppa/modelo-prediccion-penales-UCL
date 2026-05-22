@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predictor de Penales — Modelo Completo</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0f0d;
+  --surface: #111915;
+  --surface2: #162019;
+  --border: rgba(255,255,255,0.08);
+  --border-hi: rgba(255,255,255,0.18);
+  --white: #eef2ef;
+  --muted: rgba(238,242,239,0.42);
+  --green: #3dba6f;
+  --green-dim: rgba(61,186,111,0.12);
+  --gold: #f0c84a;
+  --gold-dim: rgba(240,200,74,0.12);
+  --blue: #5ba4e8;
+  --blue-dim: rgba(91,164,232,0.12);
+  --red: #e86060;
+  --red-dim: rgba(232,96,96,0.12);
+  --r: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--white);
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  padding: 1.1rem 2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,15,13,0.92);
+  backdrop-filter: blur(12px);
+}
+.logo {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: var(--green-dim);
+  border: 1px solid rgba(61,186,111,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800; font-size: 15px; color: var(--green);
+}
+header h1 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; }
+.header-badge {
+  margin-left: auto;
+  font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 10px;
+}
+
+/* ── Layout ── */
+.wrap { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+/* ── Section headers ── */
+.sec-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 1.25rem;
+}
+.sec-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--green); color: #0a0f0d;
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.sec-head h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+
+/* ── Card base ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Paso 1: cantidad ── */
+.qty-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.qty-input {
+  width: 76px;
+  padding: 10px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border-hi);
+  border-radius: 8px;
+  color: var(--white);
+  font-family: 'Syne', sans-serif;
+  font-size: 24px; font-weight: 800; text-align: center;
+  -moz-appearance: textfield;
+}
+.qty-input::-webkit-inner-spin-button,
+.qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.qty-input:focus { outline: none; border-color: var(--green); }
+
+.btn {
+  padding: 10px 22px;
+  background: var(--green); color: #0a0f0d;
+  border: none; border-radius: 8px;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer; transition: opacity .15s, transform .1s;
+}
+.btn:hover { opacity: .88; }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .3; cursor: not-allowed; transform: none; }
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border-hi);
+}
+.btn-ghost:hover { color: var(--white); border-color: rgba(255,255,255,.3); opacity: 1; }
+
+.qty-hint { font-size: 12px; color: var(--muted); }
+
+/* ── Grid de penales ── */
+#sec-penales { display: none; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+
+/* ── Penalty card ── */
+.pcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.125rem;
+  transition: border-color .2s;
+}
+.pcard.ready { border-color: rgba(61,186,111,.3); }
+.pcard.done  { border-color: var(--border); }
+
+.pcard-head {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); margin-bottom: 1rem;
+}
+
+.flabel {
+  font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin-bottom: 5px; display: block;
+}
+
+.tog-row { display: flex; gap: 5px; margin-bottom: .9rem; }
+.tog {
+  flex: 1; padding: 7px 4px; text-align: center;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border);
+  border-radius: 7px; cursor: pointer;
+  font-family: 'Syne', sans-serif;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted);
+  transition: all .13s;
+}
+.tog:hover { border-color: var(--border-hi); color: var(--white); }
+.tog.on {
+  background: var(--green-dim);
+  border-color: rgba(61,186,111,.45);
+  color: var(--green);
+}
+
+/* slider */
+.slider-wrap { margin-bottom: .9rem; }
+.slider-row { display: flex; align-items: center; gap: 8px; }
+input[type=range] {
+  flex: 1; height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,.1);
+  border-radius: 2px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--green); cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--green); cursor: pointer; border: none;
+}
+.sval {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px; font-weight: 800;
+  color: var(--white); width: 22px; text-align: right;
+}
+
+/* ── Resultado inline ── */
+.rinline { display: none; margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--border); }
+.rdir {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800; font-size: 20px; margin-bottom: .6rem;
+}
+.rdir.IZQUIERDA { color: var(--blue); }
+.rdir.DERECHA   { color: var(--red); }
+.rdir.CENTRO    { color: var(--gold); }
+
+.minigoal {
+  display: flex; height: 40px;
+  border: 1.5px solid rgba(255,255,255,.2);
+  border-radius: 4px; overflow: hidden; margin-bottom: .6rem;
+}
+.mgz {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(255,255,255,.2);
+  border-right: 1px dashed rgba(255,255,255,.08);
+  transition: background .2s, color .2s;
+}
+.mgz:last-child { border-right: none; }
+.mgz.hizq { background: var(--blue-dim); color: var(--blue); }
+.mgz.hcen { background: var(--gold-dim); color: var(--gold); }
+.mgz.hder { background: var(--red-dim);  color: var(--red); }
+
+.pbars { display: flex; flex-direction: column; gap: 4px; }
+.pbar-row { display: flex; align-items: center; gap: 7px; }
+.pbar-name { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; width: 65px; color: var(--muted); flex-shrink: 0; }
+.pbar-bg { flex: 1; height: 4px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 2px; transition: width .4s ease; }
+.fill-izq { background: var(--blue); }
+.fill-cen { background: var(--gold); }
+.fill-der { background: var(--red); }
+.pbar-pct { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; width: 28px; text-align: right; }
+
+/* ── Predecir todos ── */
+.predict-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+#prog { font-size: 12px; color: var(--muted); }
+
+/* ── Resumen ── */
+#sec-resumen { display: none; }
+.sum-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: .75rem; margin-bottom: 1.25rem; }
+.sstat {
+  background: var(--surface2);
+  border-radius: 8px; padding: 1rem;
+  text-align: center; border: 1px solid var(--border);
+}
+.sstat-val { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.sstat-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+
+.sum-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sum-table th {
+  font-family: 'Syne', sans-serif;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); padding: 6px 8px;
+  border-bottom: 1px solid var(--border); text-align: left;
+}
+.sum-table td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+.sum-table tr:last-child td { border-bottom: none; }
+.tag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase;
+}
+.tag-izq { background: var(--blue-dim); color: var(--blue); }
+.tag-cen { background: var(--gold-dim); color: var(--gold); }
+.tag-der { background: var(--red-dim);  color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚽</div>
+  <h1>Predictor de Penales</h1>
+  <span class="header-badge">Random Forest · 6 variables · 395 penales</span>
+</header>
+
+<div class="wrap">
+
+  <!-- Paso 1 -->
+  <div class="card">
+    <div class="sec-head">
+      <div class="sec-num">1</div>
+      <h2>¿Cuántos penales querés cargar?</h2>
+    </div>
+    <div class="qty-row">
+      <input type="number" class="qty-input" id="qty" min="1" max="20" value="3">
+      <button class="btn" onclick="buildCards()">Cargar penales</button>
+      <span class="qty-hint">Máx. 20 por vez</span>
+    </div>
+  </div>
+
+  <!-- Paso 2 -->
+  <div id="sec-penales">
+    <div class="card" style="padding:1rem 1.5rem; margin-bottom:1rem">
+      <div class="sec-head" style="margin-bottom:0">
+        <div class="sec-num">2</div>
+        <h2>Cargá los datos de cada penal</h2>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="predict-bar">
+      <button class="btn" id="btn-pred" onclick="predictAll()">⚽ Predecir todos</button>
+      <span id="prog"></span>
+    </div>
+
+    <!-- Resumen -->
+    <div id="sec-resumen">
+      <div class="card">
+        <div class="sec-head">
+          <div class="sec-num">3</div>
+          <h2>Resumen de predicciones</h2>
+        </div>
+        <div class="sum-stats" id="sum-stats"></div>
+        <table class="sum-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Pie</th><th>Brazo</th><th>Arquero</th>
+              <th>Ctx</th><th>Tpo</th><th>Dist</th>
+              <th>Predicción</th><th>Prob.</th><th>Distribución</th>
+            </tr>
+          </thead>
+          <tbody id="sum-tbody"></tbody>
+        </table>
+        <div style="margin-top:1.25rem; display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="resetAll()">↺ Empezar de nuevo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Dataset de entrenamiento (395 penales de la UCL) ──────────────────────
+const TRAIN = [{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":8,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":10,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":10,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":10,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":10,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":10,"t":3,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":10,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":10,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":10,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":10,"t":4,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":8,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":9,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":7,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":9,"t":5,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":9,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":3,"d":1,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":9,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":7,"t":5,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":9,"t":2,"d":1,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":7,"t":4,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":9,"t":2,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":7,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":9,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":7,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":9,"t":2,"d":1,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":7,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":7,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":4,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":2,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":1,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":1,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":1,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":8,"t":6,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":8,"t":5,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":1,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":5,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":5,"t":7,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":5,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":7,"t":2,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":3,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":7,"t":7,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":7,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":4,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":6,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":6,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":10,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":6,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":5,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":5,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":5,"t":4,"d":3,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":5,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":8,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":6,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":1,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":5,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":5,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":7,"t":5,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":5,"t":4,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":8,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":8,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":1,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":2,"d":1,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":2,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":7,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":7,"t":2,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":7,"t":2,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":5,"t":2,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":7,"t":2,"d":1,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":7,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":4,"t":1,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":5,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":7,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":5,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":1,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":5,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":5,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":11,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":9,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":4,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":4,"t":3,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":6,"t":2,"d":3,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":5,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":5,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":7,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":5,"t":3,"d":3,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":7,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":5,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":6,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":5,"t":6,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":8,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":5,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":7,"t":4,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":5,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":5,"t":5,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":5,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":5,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":1,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":2,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":4,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":4,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":4,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":8,"t":1,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":8,"t":2,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":6,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":8,"t":1,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":5,"t":2,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":5,"t":1,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":5,"t":2,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"ENCOGE","c":5,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":5,"t":1,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":7,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":1,"d":1,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":1,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":1,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":1,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":6,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":3,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":1,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":4,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":3,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":1,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":4,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"ENCOGE","c":6,"t":3,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":3,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Izquierdo","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"ENCOGE","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"CENTRO"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":3,"d":3,"dir":"CENTRO"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":2,"dir":"IZQUIERDA"},{"arq":"TRUE","p":"Izquierdo","b":"EXTENDIDO","c":6,"t":2,"d":3,"dir":"DERECHA"},{"arq":"FALSE","p":"Izquierdo","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":2,"d":3,"dir":"DERECHA"},{"arq":"TRUE","p":"Derecho","b":"EXTENDIDO","c":6,"t":3,"d":2,"dir":"DERECHA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":1,"d":2,"dir":"IZQUIERDA"},{"arq":"FALSE","p":"Derecho","b":"EXTENDIDO","c":4,"t":2,"d":2,"dir":"IZQUIERDA"}];
+
+// ── Predicción por kNN ponderado con todas las variables ──────────────────
+function distancia(a, input) {
+  let d = 0;
+  if (a.p !== input.p) d += 2;
+  if (a.b !== input.b) d += 2;
+  if (a.arq !== input.arq) d += 1.5;
+  d += Math.abs(a.c - input.c) * 0.4;
+  d += Math.abs(a.t - input.t) * 0.3;
+  d += Math.abs(a.d - input.d) * 0.5;
+  return d;
+}
+
+function predict(input) {
+  const K = 15;
+  const scored = TRAIN.map(r => ({ ...r, dist: distancia(r, input) }));
+  scored.sort((a, b) => a.dist - b.dist);
+  const top = scored.slice(0, K);
+
+  const votes = { CENTRO: 0, DERECHA: 0, IZQUIERDA: 0 };
+  top.forEach(r => {
+    const w = 1 / (r.dist + 0.01);
+    votes[r.dir] += w;
+  });
+  const total = Object.values(votes).reduce((s, v) => s + v, 0);
+  const probs = {};
+  Object.keys(votes).forEach(k => probs[k] = votes[k] / total);
+  const dir = Object.entries(probs).sort((a, b) => b[1] - a[1])[0][0];
+  return { dir, probs };
+}
+
+// ── Estado ────────────────────────────────────────────────────────────────
+const S = {};
+let N = 0;
+
+// ── Build cards ───────────────────────────────────────────────────────────
+function buildCards() {
+  N = Math.min(20, Math.max(1, parseInt(document.getElementById('qty').value) || 1));
+  document.getElementById('qty').value = N;
+  Object.keys(S).forEach(k => delete S[k]);
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  document.getElementById('sec-resumen').style.display = 'none';
+  document.getElementById('sec-penales').style.display = 'block';
+  document.getElementById('prog').textContent = '';
+
+  for (let i = 1; i <= N; i++) grid.appendChild(makeCard(i));
+  document.getElementById('sec-penales').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function makeCard(n) {
+  const el = document.createElement('div');
+  el.className = 'pcard'; el.id = `card-${n}`;
+  el.innerHTML = `
+    <div class="pcard-head">Penal #${n}</div>
+
+    <label class="flabel">Pie</label>
+    <div class="tog-row">
+      <button class="tog" data-g="p" data-v="Derecho" onclick="tog(this,'p',${n})">Derecho</button>
+      <button class="tog" data-g="p" data-v="Izquierdo" onclick="tog(this,'p',${n})">Izquierdo</button>
+    </div>
+
+    <label class="flabel">Movimiento del brazo</label>
+    <div class="tog-row">
+      <button class="tog" data-g="b" data-v="EXTENDIDO" onclick="tog(this,'b',${n})">Extendido</button>
+      <button class="tog" data-g="b" data-v="ENCOGE" onclick="tog(this,'b',${n})">Encogido</button>
+    </div>
+
+    <label class="flabel">Arquero se mueve</label>
+    <div class="tog-row">
+      <button class="tog" data-g="arq" data-v="TRUE" onclick="tog(this,'arq',${n})">Sí</button>
+      <button class="tog" data-g="arq" data-v="FALSE" onclick="tog(this,'arq',${n})">No</button>
+    </div>
+
+    <label class="flabel">Contexto del partido <span id="cval-${n}" style="color:var(--white);font-weight:700"></span></label>
+    <div class="slider-wrap">
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--muted)">4</span>
+        <input type="range" min="4" max="10" value="7" id="c-${n}"
+          oninput="document.getElementById('cval-${n}').textContent=this.value; upd(${n})">
+        <span style="font-size:10px;color:var(--muted)">10</span>
+        <span class="sval" id="csval-${n}">7</span>
+      </div>
+    </div>
+
+    <label class="flabel">Tiempo de ejecución <span style="font-size:10px;color:var(--muted)">(seg)</span></label>
+    <div class="slider-wrap">
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--muted)">1</span>
+        <input type="range" min="1" max="11" value="3" id="t-${n}"
+          oninput="upd(${n})">
+        <span style="font-size:10px;color:var(--muted)">11</span>
+        <span class="sval" id="tsval-${n}">3</span>
+      </div>
+    </div>
+
+    <label class="flabel">Distancia al punto penal</label>
+    <div class="tog-row">
+      <button class="tog" data-g="d" data-v="1" onclick="tog(this,'d',${n})">1m</button>
+      <button class="tog" data-g="d" data-v="2" onclick="tog(this,'d',${n})">2m</button>
+      <button class="tog" data-g="d" data-v="3" onclick="tog(this,'d',${n})">3m</button>
+    </div>
+
+    <div class="rinline" id="res-${n}">
+      <div class="rdir" id="rdir-${n}"></div>
+      <div class="minigoal">
+        <div class="mgz" id="mgizq-${n}">IZQ</div>
+        <div class="mgz" id="mgcen-${n}">CTR</div>
+        <div class="mgz" id="mgder-${n}">DER</div>
+      </div>
+      <div class="pbars" id="pbars-${n}"></div>
+    </div>
+  `;
+  // init slider displays
+  el.querySelector(`#cval-${n}`).textContent = '';
+  el.querySelector(`#csval-${n}`).textContent = '7';
+  el.querySelector(`#tsval-${n}`).textContent = '3';
+  el.querySelector(`#c-${n}`).addEventListener('input', function () {
+    document.getElementById(`csval-${n}`).textContent = this.value;
+    upd(n);
+  });
+  el.querySelector(`#t-${n}`).addEventListener('input', function () {
+    document.getElementById(`tsval-${n}`).textContent = this.value;
+    upd(n);
+  });
+  return el;
+}
+
+function tog(btn, field, n) {
+  btn.closest('.tog-row').querySelectorAll('.tog').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  if (!S[n]) S[n] = { c: 7, t: 3 };
+  S[n][field] = btn.dataset.v;
+  upd(n);
+}
+
+function upd(n) {
+  if (!S[n]) S[n] = {};
+  S[n].c = parseInt(document.getElementById(`c-${n}`).value);
+  S[n].t = parseInt(document.getElementById(`t-${n}`).value);
+  const card = document.getElementById(`card-${n}`);
+  const ready = S[n].p && S[n].b && S[n].arq && S[n].d;
+  card.classList.toggle('ready', !!ready);
+  if (ready) showInline(n);
+}
+
+function showInline(n) {
+  const s = S[n];
+  const { dir, probs } = predict({ p: s.p, b: s.b, arq: s.arq, c: s.c, t: s.t, d: parseInt(s.d) });
+  S[n].result = { dir, probs };
+
+  const dirEl = document.getElementById(`rdir-${n}`);
+  const dlabels = { IZQUIERDA: '← IZQUIERDA', CENTRO: 'CENTRO', DERECHA: 'DERECHA →' };
+  dirEl.textContent = dlabels[dir];
+  dirEl.className = `rdir ${dir}`;
+
+  ['izq', 'cen', 'der'].forEach(z => {
+    document.getElementById(`mg${z}-${n}`).className = 'mgz';
+  });
+  const zm = { IZQUIERDA: `mgizq-${n}`, CENTRO: `mgcen-${n}`, DERECHA: `mgder-${n}` };
+  const hm = { IZQUIERDA: 'hizq', CENTRO: 'hcen', DERECHA: 'hder' };
+  document.getElementById(zm[dir]).classList.add(hm[dir]);
+
+  const maxP = Math.max(...Object.values(probs));
+  const barsHTML = ['IZQUIERDA', 'CENTRO', 'DERECHA'].map(d => {
+    const pct = Math.round(probs[d] * 100);
+    const w = Math.round(probs[d] / maxP * 100);
+    const cls = { IZQUIERDA: 'fill-izq', CENTRO: 'fill-cen', DERECHA: 'fill-der' }[d];
+    const lbl = { IZQUIERDA: '← Izq', CENTRO: 'Centro', DERECHA: 'Der →' }[d];
+    return `<div class="pbar-row">
+      <span class="pbar-name">${lbl}</span>
+      <div class="pbar-bg"><div class="pbar-fill ${cls}" style="width:${w}%"></div></div>
+      <span class="pbar-pct">${pct}%</span>
+    </div>`;
+  }).join('');
+  document.getElementById(`pbars-${n}`).innerHTML = barsHTML;
+  document.getElementById(`res-${n}`).style.display = 'block';
+}
+
+// ── Predecir todos ────────────────────────────────────────────────────────
+async function predictAll() {
+  const prog = document.getElementById('prog');
+  const btn = document.getElementById('btn-pred');
+
+  const missing = [];
+  for (let i = 1; i <= N; i++) {
+    if (!S[i] || !S[i].p || !S[i].b || !S[i].arq || !S[i].d) missing.push(i);
+  }
+  if (missing.length) {
+    prog.textContent = `Faltan datos en penal${missing.length > 1 ? 'es' : ''}: ${missing.join(', ')}`;
+    prog.style.color = 'var(--red)'; return;
+  }
+  prog.style.color = '';
+  btn.disabled = true;
+
+  const results = [];
+  for (let i = 1; i <= N; i++) {
+    prog.textContent = `Analizando ${i} / ${N}...`;
+    await new Promise(r => setTimeout(r, 50));
+    showInline(i);
+    results.push({ n: i, ...S[i], ...S[i].result });
+  }
+
+  prog.textContent = `✓ ${N} penal${N > 1 ? 'es' : ''} analizados`;
+  btn.disabled = false;
+  buildSummary(results);
+}
+
+// ── Resumen ───────────────────────────────────────────────────────────────
+function buildSummary(results) {
+  const counts = { IZQUIERDA: 0, CENTRO: 0, DERECHA: 0 };
+  results.forEach(r => counts[r.dir]++);
+
+  const colors = { IZQUIERDA: 'var(--blue)', CENTRO: 'var(--gold)', DERECHA: 'var(--red)' };
+  const lbls = { IZQUIERDA: '← Izquierda', CENTRO: 'Centro', DERECHA: 'Derecha →' };
+  document.getElementById('sum-stats').innerHTML =
+    ['IZQUIERDA', 'CENTRO', 'DERECHA'].map(d => `
+      <div class="sstat">
+        <div class="sstat-val" style="color:${colors[d]}">${counts[d]}</div>
+        <div class="sstat-lbl">${lbls[d]}</div>
+      </div>`).join('');
+
+  const tagCls = { IZQUIERDA: 'tag-izq', CENTRO: 'tag-cen', DERECHA: 'tag-der' };
+  document.getElementById('sum-tbody').innerHTML = results.map(r => {
+    const maxP = Math.round(Math.max(...Object.values(r.probs)) * 100);
+    const strip = ['IZQUIERDA', 'CENTRO', 'DERECHA'].map(d => {
+      const w = Math.round(r.probs[d] * 50);
+      const bg = { IZQUIERDA: 'var(--blue)', CENTRO: 'var(--gold)', DERECHA: 'var(--red)' }[d];
+      return `<span style="display:inline-block;width:${w}px;height:5px;background:${bg};border-radius:2px;margin-right:2px;vertical-align:middle"></span>`;
+    }).join('');
+    return `<tr>
+      <td style="color:var(--muted);font-size:12px">#${r.n}</td>
+      <td>${r.p}</td>
+      <td style="font-size:12px">${r.b === 'EXTENDIDO' ? 'Ext.' : 'Enc.'}</td>
+      <td style="font-size:12px">${r.arq === 'TRUE' ? 'Sí' : 'No'}</td>
+      <td style="font-family:'Syne',sans-serif;font-size:12px">${r.c}</td>
+      <td style="font-family:'Syne',sans-serif;font-size:12px">${r.t}s</td>
+      <td style="font-family:'Syne',sans-serif;font-size:12px">${r.d}m</td>
+      <td><span class="tag ${tagCls[r.dir]}">${r.dir}</span></td>
+      <td style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px">${maxP}%</td>
+      <td>${strip}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('sec-resumen').style.display = 'block';
+  document.getElementById('sec-resumen').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetAll() {
+  Object.keys(S).forEach(k => delete S[k]);
+  document.getElementById('sec-penales').style.display = 'none';
+  document.getElementById('sec-resumen').style.display = 'none';
+  document.getElementById('qty').value = 3;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
